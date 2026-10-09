@@ -1,0 +1,22 @@
+# macOS system files
+.DS_Store
+*/.DS_Store
+.AppleDouble
+.LSOverride
+
+# Swift Package Manager
+.build/
+Packages/
+.swiftpm/
+
+# Xcode & workspace files (if opened in Xcode)
+xcuserdata/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+
+# User-specific & local files
+*.log
+.env
+.idea/
+.vscode/

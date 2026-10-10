@@ -1,12 +1,20 @@
 import Foundation
 
 /// The output format for a download.
-enum DownloadFormat: String, CaseIterable, Identifiable {
-    case video    = "Video"
-    case audioMP3 = "MP3"
-    case audioM4A = "M4A"
+enum DownloadFormat: String, CaseIterable, Identifiable, Codable {
+    case video    = "Video (MP4)"
+    case audioMP3 = "Audio (MP3)"
+    case audioM4A = "Audio (M4A)"
 
     var id: String { rawValue }
+
+    var shortName: String {
+        switch self {
+        case .video:    return "MP4"
+        case .audioMP3: return "MP3"
+        case .audioM4A: return "M4A"
+        }
+    }
 
     var icon: String {
         switch self {
@@ -19,19 +27,23 @@ enum DownloadFormat: String, CaseIterable, Identifiable {
         self == .audioMP3 || self == .audioM4A
     }
 
-    /// Subfolder name that matches the workspace download-media skill layout.
+    /// Subfolder name matching workspace rules and standard media conventions.
     var defaultSubfolder: String {
         isAudio ? "audio" : "videos"
     }
 
-    /// Extra yt-dlp flags for this format.
-    /// Video uses standard H.264/AAC MP4 profile compatible with macOS QuickTime & Finder.
+    /// Default arguments for yt-dlp using best quality.
     var ytdlpArguments: [String] {
+        arguments(quality: .best)
+    }
+
+    /// Generates yt-dlp arguments taking user quality preference into account.
+    func arguments(quality: VideoQualityPreference = .best) -> [String] {
         switch self {
         case .video:
             return [
                 "--no-playlist",
-                "-S", "vcodec:h264,lang,quality,res,fps,hdr:12,acodec:aac",
+                "-S", quality.sortArgument,
                 "--merge-output-format", "mp4",
                 "--recode-video", "mp4",
                 "--windows-filenames"
@@ -41,6 +53,7 @@ enum DownloadFormat: String, CaseIterable, Identifiable {
                 "--no-playlist",
                 "-x",
                 "--audio-format", "mp3",
+                "--audio-quality", "0",
                 "--windows-filenames"
             ]
         case .audioM4A:

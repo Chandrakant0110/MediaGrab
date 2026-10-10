@@ -4,6 +4,7 @@ import AppKit
 /// A single row in the downloads list showing thumbnail, title, format badge, progress bar,
 /// status details, Finder button, and an expandable real-time yt-dlp log viewer.
 struct DownloadProgressView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let item: DownloadItem
     let manager: DownloadManager
 
@@ -46,10 +47,14 @@ struct DownloadProgressView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(.white.opacity(0.04))
+                .fill(Theme.cardFill(for: colorScheme))
+                .shadow(
+                    color: Theme.cardShadow(for: colorScheme),
+                    radius: 4, y: 1
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(.white.opacity(0.07), lineWidth: 1)
+                        .strokeBorder(Theme.cardBorder(for: colorScheme), lineWidth: 1)
                 )
         )
     }
@@ -66,13 +71,13 @@ struct DownloadProgressView: View {
                 Text(item.title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(2)
                     .help(item.title)
 
                 HStack(spacing: 6) {
                     // Format badge
-                    Text(item.format.rawValue)
+                    Text(item.format.shortName)
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .padding(.horizontal, 6)
@@ -118,9 +123,11 @@ struct DownloadProgressView: View {
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(item.isLogExpanded ? .purple.opacity(0.25) : .white.opacity(0.06))
+                            .fill(item.isLogExpanded
+                                  ? Color.purple.opacity(colorScheme == .dark ? 0.35 : 0.15)
+                                  : Theme.controlBackground(for: colorScheme))
                     )
-                    .foregroundStyle(item.isLogExpanded ? Color(red: 0.7, green: 0.6, blue: 1.0) : .secondary)
+                    .foregroundStyle(item.isLogExpanded ? Color.purple : Color.secondary)
                 }
                 .buttonStyle(.plain)
                 .help("View real-time yt-dlp logs")
@@ -132,9 +139,9 @@ struct DownloadProgressView: View {
                     } label: {
                         Image(systemName: "folder.fill")
                             .font(.caption)
-                            .foregroundStyle(Color(red: 0.45, green: 0.75, blue: 1.0))
+                            .foregroundStyle(Color.blue)
                             .padding(6)
-                            .background(.white.opacity(0.08), in: Circle())
+                            .background(Theme.controlBackground(for: colorScheme), in: Circle())
                     }
                     .buttonStyle(.plain)
                     .help("Show in Finder")
@@ -169,27 +176,18 @@ struct DownloadProgressView: View {
         }
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+                .strokeBorder(Theme.cardBorder(for: colorScheme), lineWidth: 1)
         )
     }
 
     private var thumbnailPlaceholder: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.15, green: 0.15, blue: 0.22),
-                            Color(red: 0.08, green: 0.08, blue: 0.14)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(Theme.thumbnailPlaceholder(for: colorScheme))
 
             Image(systemName: item.format.icon)
                 .font(.body)
-                .foregroundStyle(accentColor.opacity(0.7))
+                .foregroundStyle(accentColor.opacity(0.85))
         }
         .frame(width: 86, height: 52)
     }
@@ -203,19 +201,10 @@ struct DownloadProgressView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(.white.opacity(0.08))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08))
 
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.55, green: 0.30, blue: 1.0),
-                                    Color(red: 0.30, green: 0.55, blue: 1.0),
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .fill(Theme.buttonGradient)
                         .frame(width: max(0, geo.size.width * progress))
                         .animation(.spring(duration: 0.35), value: progress)
                 }
@@ -251,7 +240,7 @@ struct DownloadProgressView: View {
                         Text("Copy")
                     }
                     .font(.caption2)
-                    .foregroundStyle(Color(red: 0.65, green: 0.75, blue: 1.0))
+                    .foregroundStyle(Color.blue)
                 }
                 .buttonStyle(.plain)
                 .help("Copy logs to clipboard")
@@ -277,11 +266,11 @@ struct DownloadProgressView: View {
                     .padding(8)
                 }
                 .frame(height: 120)
-                .background(Color.black.opacity(0.45))
+                .background(Color(red: 0.12, green: 0.12, blue: 0.16))
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
                 )
                 .onAppear {
                     if !item.logs.isEmpty {
@@ -301,7 +290,7 @@ struct DownloadProgressView: View {
 
     private func colorForLogLine(_ line: String) -> Color {
         if line.contains("ERROR:") || line.hasPrefix("ERROR") {
-            return Color(red: 1.0, green: 0.35, blue: 0.35)
+            return Color(red: 1.0, green: 0.40, blue: 0.40)
         } else if line.contains("WARNING:") || line.hasPrefix("WARNING") {
             return Color(red: 1.0, green: 0.85, blue: 0.35)
         } else if line.contains("[Merger]") || line.contains("[ExtractAudio]") {
@@ -309,7 +298,7 @@ struct DownloadProgressView: View {
         } else if line.contains("[download]") {
             return Color(red: 0.45, green: 0.75, blue: 1.0)
         } else {
-            return Color.white.opacity(0.8)
+            return Color.white.opacity(0.85)
         }
     }
 }

@@ -110,7 +110,8 @@ enum YTDLPRunner {
     static func download(
         url: String,
         format: DownloadFormat,
-        outputDir: String
+        outputDir: String,
+        quality: VideoQualityPreference = .best
     ) -> AsyncThrowingStream<ProgressUpdate, Error> {
         AsyncThrowingStream { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -122,7 +123,7 @@ enum YTDLPRunner {
                     )
 
                     // Build arguments
-                    var arguments = format.ytdlpArguments
+                    var arguments = format.arguments(quality: quality)
 
                     if let ffmpeg = ffmpegPath {
                         arguments += ["--ffmpeg-location", ffmpeg]

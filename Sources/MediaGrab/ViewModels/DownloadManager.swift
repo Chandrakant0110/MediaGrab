@@ -11,9 +11,14 @@ final class DownloadManager {
 
     var downloads: [DownloadItem] = []
     var currentURL: String = ""
-    var selectedFormat: DownloadFormat = .video
+    var selectedFormat: DownloadFormat
     var savePath: String
     var dependencyManager = DependencyManager.shared
+    var settings = AppSettings.shared
+    var historyManager = HistoryManager.shared
+
+    /// Detected media URL waiting on clipboard (if any)
+    var clipboardSuggestion: String? = nil
 
     /// Computed: is any download currently in progress?
     var isDownloading: Bool {
@@ -28,32 +33,65 @@ final class DownloadManager {
     // MARK: - Init
 
     init() {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let workspaceOutputs = home.appendingPathComponent("chandrakant_bot/outputs/videos")
-
-        // If running inside the workspace repository, follow the workspace file-saving rule
-        if FileManager.default.fileExists(atPath: home.appendingPathComponent("chandrakant_bot").path) {
-            self.savePath = workspaceOutputs.path
-        } else {
-            // General macOS user release default: ~/Downloads/MediaGrab/videos
-            let defaultDownloads = home.appendingPathComponent("Downloads/MediaGrab/videos")
-            self.savePath = defaultDownloads.path
-        }
+        let initialFormat = AppSettings.shared.defaultFormat
+        self.selectedFormat = initialFormat
+        self.savePath = AppSettings.shared.effectiveSavePath(for: initialFormat)
     }
 
     // MARK: - Actions
 
-    /// Swap the trailing folder between "videos" and "audio" when the format changes.
+    /// Updates save path based on user settings and current format.
     func updateSavePathForFormat() {
-        let url = URL(fileURLWithPath: savePath)
-        let last = url.lastPathComponent
-        // Only auto-swap if the current leaf is one of our known folders
-        if last == "videos" || last == "audio" {
-            let parent = url.deletingLastPathComponent()
-            savePath = parent
-                .appendingPathComponent(selectedFormat.defaultSubfolder)
-                .path
+        savePath = settings.effectiveSavePath(for: selectedFormat)
+    }
+
+    /// Check system clipboard for media link suggestions.
+    func checkClipboard() {
+        guard settings.autoPasteClipboard else {
+            clipboardSuggestion = nil
+            return
         }
+        guard let raw = NSPasteboard.general.string(forType: .string) else {
+            clipboardSuggestion = nil
+            return
+        }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isMediaURL(trimmed) else {
+            clipboardSuggestion = nil
+            return
+        }
+
+        // If the URL is already loaded into input or currently downloading, don't nag
+        if currentURL == trimmed || downloads.contains(where: { $0.url == trimmed }) {
+            clipboardSuggestion = nil
+            return
+        }
+
+        clipboardSuggestion = trimmed
+    }
+
+    /// Apply the detected clipboard suggestion directly into input
+    func applyClipboardSuggestion() {
+        if let suggestion = clipboardSuggestion {
+            currentURL = suggestion
+            clipboardSuggestion = nil
+        }
+    }
+
+    private func isMediaURL(_ urlStr: String) -> Bool {
+        let lower = urlStr.lowercased()
+        guard lower.hasPrefix("http://") || lower.hasPrefix("https://") else { return false }
+        let domains = [
+            "youtube.com", "youtu.be",
+            "instagram.com",
+            "tiktok.com",
+            "twitter.com", "x.com",
+            "reddit.com",
+            "facebook.com", "fb.watch",
+            "vimeo.com",
+            "soundcloud.com"
+        ]
+        return domains.contains { lower.contains($0) }
     }
 
     /// Kick off a download for the current URL + format.
@@ -70,11 +108,13 @@ final class DownloadManager {
         item.status = .waiting
         downloads.insert(item, at: 0)
         currentURL = ""
+        clipboardSuggestion = nil
 
-        let itemID = item.id
-        let format = item.format
-        let dir    = item.savePath
-        let url    = item.url
+        let itemID  = item.id
+        let format  = item.format
+        let dir     = item.savePath
+        let url     = item.url
+        let quality = settings.videoQuality
 
         // 1. Fetch metadata in background (clean title & thumbnail)
         Task {
@@ -92,7 +132,12 @@ final class DownloadManager {
         // 2. Start streaming download
         Task {
             do {
-                let stream = YTDLPRunner.download(url: url, format: format, outputDir: dir)
+                let stream = YTDLPRunner.download(
+                    url: url,
+                    format: format,
+                    outputDir: dir,
+                    quality: quality
+                )
 
                 for try await update in stream {
                     guard let idx = self.downloads.firstIndex(where: { $0.id == itemID }) else { break }
@@ -117,8 +162,7 @@ final class DownloadManager {
                         self.downloads[idx].isLogExpanded = true
                     } else if update.isComplete {
                         let finalPath = update.finalFilePath ?? self.downloads[idx].finalFilePath ?? dir
-                        self.downloads[idx].status = .completed(filePath: finalPath)
-                        self.downloads[idx].completedAt = Date()
+                        self.markCompleted(index: idx, finalPath: finalPath)
                     } else if let stage = update.processingStage {
                         self.downloads[idx].status = .processing(stage: stage)
                     } else if let pct = update.percentage {
@@ -134,8 +178,7 @@ final class DownloadManager {
                 if let idx = self.downloads.firstIndex(where: { $0.id == itemID }),
                    self.downloads[idx].status.isActive {
                     let finalPath = self.downloads[idx].finalFilePath ?? dir
-                    self.downloads[idx].status = .completed(filePath: finalPath)
-                    self.downloads[idx].completedAt = Date()
+                    self.markCompleted(index: idx, finalPath: finalPath)
                 }
             } catch {
                 if let idx = self.downloads.firstIndex(where: { $0.id == itemID }) {
@@ -144,6 +187,37 @@ final class DownloadManager {
                 }
             }
         }
+    }
+
+    /// Handles marking an item as completed, persisting to history, and triggering sound/notification.
+    private func markCompleted(index: Int, finalPath: String) {
+        downloads[index].status = .completed(filePath: finalPath)
+        downloads[index].completedAt = Date()
+
+        // 1. Record to persistent history
+        historyManager.record(from: downloads[index], finalPath: finalPath)
+
+        // 2. Play completion sound if enabled
+        if settings.playNotificationSound {
+            if !(NSSound(named: "Glass")?.play() ?? false) {
+                NSSound.beep()
+            }
+        }
+
+        // 3. Post system notification if enabled
+        if settings.sendSystemNotification {
+            sendCompletionNotification(for: downloads[index], finalPath: finalPath)
+        }
+    }
+
+    private func sendCompletionNotification(for item: DownloadItem, finalPath: String) {
+        let notification = NSUserNotification()
+        notification.title = "MediaGrab"
+        notification.subtitle = "Download Complete"
+        notification.informativeText = item.title
+        notification.soundName = nil
+        notification.userInfo = ["filePath": finalPath]
+        NSUserNotificationCenter.default.deliver(notification)
     }
 
     /// Toggle logs disclosure for an item.
@@ -166,7 +240,7 @@ final class DownloadManager {
         downloads.removeAll { !$0.status.isActive }
     }
 
-    /// Show a native macOS folder picker.
+    /// Show a native macOS folder picker for the current session.
     func chooseSaveLocation() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories    = true
@@ -200,5 +274,6 @@ final class DownloadManager {
             cleaned = "https://" + cleaned
         }
         currentURL = cleaned
+        clipboardSuggestion = nil
     }
 }

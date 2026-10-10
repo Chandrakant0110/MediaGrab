@@ -2,12 +2,19 @@ import SwiftUI
 import AppKit
 
 struct URLInputView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var manager: DownloadManager
     @State private var isHovering = false
     @FocusState private var isURLFocused: Bool
 
     var body: some View {
         VStack(spacing: 16) {
+            // Smart clipboard chip
+            if let suggestion = manager.clipboardSuggestion {
+                clipboardBanner(suggestion: suggestion)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
             urlField
             formatPicker
             saveLocationRow
@@ -15,6 +22,61 @@ struct URLInputView: View {
         }
         .padding(20)
         .background(cardBackground)
+        .onAppear {
+            manager.checkClipboard()
+        }
+    }
+
+    // MARK: - Clipboard Banner
+
+    private func clipboardBanner(suggestion: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "doc.on.clipboard.fill")
+                .font(.caption)
+                .foregroundStyle(Color(red: 0.60, green: 0.40, blue: 1.0))
+
+            Text("Copied link detected:")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text(suggestion)
+                .font(.caption2)
+                .fontWeight(.medium)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Spacer()
+
+            Button("Use Link") {
+                withAnimation(.spring(duration: 0.3)) {
+                    manager.applyClipboardSuggestion()
+                    isURLFocused = true
+                }
+            }
+            .buttonStyle(.plain)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Color.purple.opacity(colorScheme == .dark ? 0.35 : 0.15), in: Capsule())
+            .foregroundStyle(Color.purple)
+
+            Button {
+                withAnimation(.spring(duration: 0.2)) {
+                    manager.clipboardSuggestion = nil
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Theme.controlBackground(for: colorScheme), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.cardBorder(for: colorScheme), lineWidth: 1))
     }
 
     // MARK: - URL text field
@@ -29,7 +91,7 @@ struct URLInputView: View {
             TextField("Paste YouTube, Instagram, or any video URL…", text: $manager.currentURL)
                 .textFieldStyle(.plain)
                 .font(.body)
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .focused($isURLFocused)
                 .onSubmit { submitIfReady() }
 
@@ -50,7 +112,7 @@ struct URLInputView: View {
             isURLFocused = true
         } label: {
             Image(systemName: "doc.on.clipboard")
-                .foregroundStyle(Color(red: 0.65, green: 0.75, blue: 1.0))
+                .foregroundStyle(Color.purple)
                 .font(.body)
                 .contentShape(Rectangle())
         }
@@ -75,21 +137,16 @@ struct URLInputView: View {
 
     @ViewBuilder
     private var urlFieldBackground: some View {
-        let focusedGradient = LinearGradient(
-            colors: [.purple.opacity(0.6), .blue.opacity(0.6)],
-            startPoint: .leading, endPoint: .trailing
-        )
-        let idleGradient = LinearGradient(
-            colors: [.white.opacity(0.12), .white.opacity(0.08)],
-            startPoint: .leading, endPoint: .trailing
-        )
-
         RoundedRectangle(cornerRadius: 12)
-            .fill(.white.opacity(0.05))
+            .fill(Theme.inputBackground(for: colorScheme))
+            .shadow(
+                color: colorScheme == .light ? Color.black.opacity(0.04) : Color.clear,
+                radius: 3, y: 1
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(
-                        isURLFocused ? focusedGradient : idleGradient,
+                        Theme.inputBorder(for: colorScheme, isFocused: isURLFocused),
                         lineWidth: isURLFocused ? 1.5 : 1
                     )
             )
@@ -135,7 +192,7 @@ struct URLInputView: View {
             }
             .buttonStyle(.plain)
             .font(.caption)
-            .foregroundStyle(Color(red: 0.45, green: 0.60, blue: 1.0))
+            .foregroundStyle(Color.blue)
         }
         .padding(.horizontal, 4)
     }
@@ -156,17 +213,6 @@ struct URLInputView: View {
 
     private var downloadButtonLabel: some View {
         let isEmpty = manager.currentURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let activeGradient = LinearGradient(
-            colors: [
-                Color(red: 0.55, green: 0.30, blue: 1.0),
-                Color(red: 0.30, green: 0.50, blue: 1.0),
-            ],
-            startPoint: .leading, endPoint: .trailing
-        )
-        let disabledGradient = LinearGradient(
-            colors: [.gray.opacity(0.25), .gray.opacity(0.18)],
-            startPoint: .leading, endPoint: .trailing
-        )
 
         return HStack(spacing: 8) {
             Image(systemName: "arrow.down.circle.fill")
@@ -177,7 +223,11 @@ struct URLInputView: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(isEmpty ? disabledGradient : activeGradient)
+                .fill(isEmpty ? Theme.buttonDisabledGradient(for: colorScheme) : Theme.buttonGradient)
+                .shadow(
+                    color: isEmpty ? Color.clear : Color.purple.opacity(0.3),
+                    radius: 6, y: 2
+                )
         )
         .foregroundStyle(isEmpty ? Color.secondary : Color.white)
     }
@@ -186,10 +236,14 @@ struct URLInputView: View {
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 16)
-            .fill(.ultraThinMaterial.opacity(0.35))
+            .fill(Theme.cardFill(for: colorScheme))
+            .shadow(
+                color: Theme.cardShadow(for: colorScheme),
+                radius: 8, y: 2
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(.white.opacity(0.07), lineWidth: 1)
+                    .strokeBorder(Theme.cardBorder(for: colorScheme), lineWidth: 1)
             )
     }
 
@@ -213,6 +267,7 @@ struct URLInputView: View {
 // MARK: - Format pill button
 
 struct FormatPill: View {
+    @Environment(\.colorScheme) private var colorScheme
     let format: DownloadFormat
     let isSelected: Bool
     let action: () -> Void
@@ -225,35 +280,27 @@ struct FormatPill: View {
     }
 
     private var pillLabel: some View {
-        let selectedFill = LinearGradient(
-            colors: [.purple.opacity(0.28), .blue.opacity(0.22)],
-            startPoint: .leading, endPoint: .trailing
-        )
-        let idleFill = LinearGradient(
-            colors: [.white.opacity(0.06), .white.opacity(0.03)],
-            startPoint: .leading, endPoint: .trailing
-        )
-
-        return HStack(spacing: 5) {
+        HStack(spacing: 5) {
             Image(systemName: format.icon)
                 .font(.caption2)
             Text(format.rawValue)
                 .font(.caption)
-                .fontWeight(.medium)
+                .fontWeight(isSelected ? .semibold : .medium)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? selectedFill : idleFill)
+                .fill(isSelected ? AnyShapeStyle(Theme.pillSelectedFill(for: colorScheme)) : AnyShapeStyle(Theme.pillIdleFill(for: colorScheme)))
+                .shadow(color: colorScheme == .light && isSelected ? Color.purple.opacity(0.12) : Color.clear, radius: 2, y: 1)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .strokeBorder(
-                            isSelected ? .purple.opacity(0.45) : .clear,
-                            lineWidth: 1
+                            isSelected ? Color.purple.opacity(0.6) : Theme.pillIdleBorder(for: colorScheme),
+                            lineWidth: isSelected ? 1.5 : 1
                         )
                 )
         )
-        .foregroundStyle(isSelected ? .white : .secondary)
+        .foregroundStyle(isSelected ? Theme.pillSelectedForeground(for: colorScheme) : Color.secondary)
     }
 }

@@ -1,11 +1,29 @@
 import SwiftUI
 import AppKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         setupMainMenu()
+        NSUserNotificationCenter.default.delegate = self
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func userNotificationCenter(_ center: NSUserNotificationCenter, shouldPresent notification: NSUserNotification) -> Bool {
+        return true
+    }
+
+    func userNotificationCenter(_ center: NSUserNotificationCenter, didActivate notification: NSUserNotification) {
+        if let path = notification.userInfo?["filePath"] as? String {
+            if FileManager.default.fileExists(atPath: path) {
+                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+            }
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func openSettings() {
+        NotificationCenter.default.post(name: .toggleSettings, object: nil)
     }
 
     private func setupMainMenu() {
@@ -16,6 +34,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About MediaGrab", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
+
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        appMenu.addItem(settingsItem)
+        appMenu.addItem(NSMenuItem.separator())
+
         appMenu.addItem(withTitle: "Hide MediaGrab", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
@@ -59,10 +83,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct MediaGrabApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var settings = AppSettings.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(settings.themeMode.colorScheme)
         }
         .defaultSize(width: 620, height: 720)
     }

@@ -289,9 +289,9 @@ struct DependencyNoticeBanner: View {
                 ProgressView()
                     .controlSize(.small)
             } else {
-                Button("Install (1-Click)") {
+                Button("Install Engines (1-Click)") {
                     Task {
-                        await depManager.installYTDLP()
+                        await depManager.installAllDependencies()
                     }
                 }
                 .buttonStyle(.borderedProminent)

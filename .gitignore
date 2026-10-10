@@ -20,3 +20,9 @@ DerivedData/
 .env
 .idea/
 .vscode/
+
+# Build and release distribution artifacts
+dist/
+*.dmg
+*.zip
+

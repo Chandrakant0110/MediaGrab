@@ -423,9 +423,11 @@ struct SettingsView: View {
                 isInstalled: depManager.hasFFmpeg,
                 version: depManager.ffmpegVersion,
                 path: depManager.ffmpegPath,
-                actionTitle: nil,
-                isBusy: false,
-                action: nil
+                actionTitle: depManager.hasFFmpeg ? nil : "Auto-Install (1-Click)",
+                isBusy: depManager.isInstalling,
+                action: depManager.hasFFmpeg ? nil : {
+                    Task { await depManager.installFFmpeg() }
+                }
             )
         }
     }

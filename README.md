@@ -1,8 +1,8 @@
 # MediaGrab 🎬
 
-A native macOS application for downloading videos and audio from YouTube, Instagram, and hundreds of other platforms using `yt-dlp` and `ffmpeg`.
+A modern, fluid native macOS application for downloading video and audio from Instagram, YouTube, Twitter/X, TikTok, and hundreds of other websites using `yt-dlp` and `ffmpeg`.
 
-![macOS 13+](https://img.shields.io/badge/macOS-13.0%2B-blue?logo=apple)
+![macOS 14+](https://img.shields.io/badge/macOS-14.0%2B-blue?logo=apple)
 ![Swift 5.9+](https://img.shields.io/badge/Swift-5.9%2B-orange?logo=swift)
 ![License MIT](https://img.shields.io/badge/license-MIT-green)
 
@@ -10,57 +10,70 @@ A native macOS application for downloading videos and audio from YouTube, Instag
 
 ## ✨ Features
 
-- **Universal Platform Support**: Download reels, videos, and music from YouTube, Instagram, Twitter/X, TikTok, and more.
-- **Video & Audio Modes**:
-  - High quality MP4 (encoded with H.264 + AAC for universal compatibility with QuickTime and macOS).
-  - High quality MP3 audio extraction.
-- **Native SwiftUI Design**: Clean, fluid macOS interface with system vibrancy, dark mode support, and micro-interactions.
-- **Real-Time Progress & Logs**: Live percentage, download speed, ETA indicators, and collapsible terminal logs.
-- **Embedded Dependency Resolution**:
-  - Automatically detects system installations (`/opt/homebrew/bin`, `/usr/local/bin`, etc.).
-  - Includes a 1-click yt-dlp installer downloading directly to Application Support if missing.
-- **Finder Integration**: One-click "Show in Finder" to instantly open downloaded files.
+- **Universal Platform Support**: Download reels, videos, stories, and songs from YouTube, Instagram, X (Twitter), TikTok, Facebook, Reddit, and 1000+ sites.
+- **High Quality Formats**:
+  - **Video (MP4)**: Remuxed with H.264 + AAC for universal compatibility with macOS Finder, QuickTime Player, iOS, and Final Cut Pro.
+  - **Audio (MP3)**: Fast high-bitrate audio extraction.
+- **⚡ 1-Click Zero-Config Engines Installer**:
+  - No Homebrew or Terminal setup required for end users!
+  - MediaGrab automatically downloads and configures official standalone `yt-dlp` and `ffmpeg` binaries with a single click.
+- **Persistent Download History**:
+  - Filter by video/audio, instant search by title/URL.
+  - Quick action buttons: Play file, Reveal in Finder, Copy Link, and Delete with option to remove or keep disk file.
+- **Customizable Preferences**:
+  - Choose separate or unified download folders for Video vs. Audio.
+  - Video quality preferences (Best Available, 1080p, 720p, 480p).
+  - Native clipboard link auto-detection (1-click download chip).
+  - Completion alerts & audio chimes.
+- **Adaptive Light & Dark Theming**:
+  - Human Interface Guidelines (HIG) compliant design tokens with elevated cards, soft shadows, and vibrant accents.
+  - Built-in Appearance selector: **System**, **Dark**, or **Light**.
+- **Real-Time Progress & Console**:
+  - Live progress bar, speed, and ETA calculation.
+  - Collapsible terminal viewer displaying real-time `yt-dlp` execution logs.
 
 ---
 
-## 🚀 Getting Started
+## 📥 Installation
+
+### Download pre-built DMG (Recommended)
+
+1. Go to the [Releases](https://github.com/Chandrakant0110/MediaGrab/releases) tab.
+2. Download **`MediaGrab-v1.0.0.dmg`** (or `MediaGrab-v1.0.0.zip`).
+3. Open the `.dmg` and drag **MediaGrab.app** into your **Applications** folder.
+
+> [!NOTE]  
+> Because MediaGrab is an open-source build without an Apple Developer paid certificate, macOS Gatekeeper may ask for confirmation on the very first launch.  
+> Either right-click `MediaGrab.app` and choose **Open**, or run this one-line command in Terminal:
+> ```bash
+> xattr -cr /Applications/MediaGrab.app
+> ```
+
+---
+
+## 🛠️ Building from Source
 
 ### Prerequisites
 
-- macOS 13.0 (Ventura) or later
-- [Xcode 15+](https://developer.apple.com/xcode/) or Swift Command Line Tools
-- `yt-dlp` and `ffmpeg` (MediaGrab will automatically look in standard Homebrew paths or offer to download yt-dlp)
+- macOS 14.0 (Sonoma) or later
+- Xcode 15+ or Swift Command Line Tools
 
 ```bash
-brew install yt-dlp ffmpeg
+# Clone repository
+git clone https://github.com/Chandrakant0110/MediaGrab.git
+cd MediaGrab
+
+# Run in development mode
+swift run
+
+# Or package into standalone MediaGrab.app & DMG
+./scripts/package_app.sh
 ```
 
-### Building & Running
-
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd MediaGrab
-   ```
-
-2. Build and run via Swift Package Manager:
-   ```bash
-   swift run
-   ```
-
-Or build an optimized release binary:
-   ```bash
-   swift build -c release
-   ```
-
----
-
-## 🗺️ Roadmap
-
-- [ ] **Custom Settings Panel**: User-configurable default download directories for audio and video.
-- [ ] **Persistent Download History**: State-backed download history with re-download and file quick-access.
-- [ ] **Clipboard Auto-Detect**: Automatically populate input when a valid media URL is copied.
-- [ ] **Quality Selector**: Choose between 1080p, 4K, or lowest file size before downloading.
+Distribution assets will be generated in `./dist/`:
+- `MediaGrab.app`
+- `MediaGrab-v1.0.0.dmg`
+- `MediaGrab-v1.0.0.zip`
 
 ---
 

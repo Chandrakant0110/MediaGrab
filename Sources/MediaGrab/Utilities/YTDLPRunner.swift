@@ -45,6 +45,16 @@ enum YTDLPRunner {
         }
     }
 
+    /// Prepares process environment including MediaGrab bundled bin directory and Homebrew paths.
+    static var environmentWithBins: [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let bundledBin = appSupport.appendingPathComponent("MediaGrab/bin").path
+        let extra = "\(bundledBin):/opt/homebrew/bin:/usr/local/bin:/opt/local/bin"
+        env["PATH"] = extra + ":" + (env["PATH"] ?? "/usr/bin:/bin")
+        return env
+    }
+
     // MARK: - Metadata Fetching
 
     /// Fetches title and thumbnail URL quickly before or during download.
@@ -59,10 +69,7 @@ enum YTDLPRunner {
                     url
                 ]
 
-                var env = ProcessInfo.processInfo.environment
-                let extra = "/opt/homebrew/bin:/usr/local/bin"
-                env["PATH"] = extra + ":" + (env["PATH"] ?? "/usr/bin:/bin")
-                process.environment = env
+                    process.environment = environmentWithBins
 
                 let pipe = Pipe()
                 process.standardOutput = pipe
@@ -142,10 +149,7 @@ enum YTDLPRunner {
                     process.executableURL = URL(fileURLWithPath: ytdlpPath)
                     process.arguments = arguments
 
-                    var env = ProcessInfo.processInfo.environment
-                    let extra = "/opt/homebrew/bin:/usr/local/bin"
-                    env["PATH"] = extra + ":" + (env["PATH"] ?? "/usr/bin:/bin")
-                    process.environment = env
+                    process.environment = environmentWithBins
 
                     let stdoutPipe = Pipe()
                     let stderrPipe = Pipe()

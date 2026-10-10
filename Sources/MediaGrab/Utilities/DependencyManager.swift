@@ -218,6 +218,64 @@ final class DependencyManager {
         }
     }
 
+    // MARK: - 1-Click Installer for ffmpeg
+
+    /// Downloads the official standalone macOS static binary of ffmpeg
+    /// directly from GitHub Releases and places it in ~/Library/Application Support/MediaGrab/bin/ffmpeg.
+    func installFFmpeg() async {
+        isInstalling = true
+        installError = nil
+        installProgressText = "Downloading ffmpeg engine…"
+
+        let targetDir = appSupportBinDir
+        let targetFile = targetDir.appendingPathComponent("ffmpeg")
+
+        do {
+            try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+
+            #if arch(arm64)
+            let arch = "arm64"
+            #else
+            let arch = "x64"
+            #endif
+
+            guard let url = URL(string: "https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffmpeg-darwin-\(arch)") else {
+                throw NSError(domain: "MediaGrab", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid ffmpeg download URL"])
+            }
+
+            let (tempURL, response) = try await URLSession.shared.download(from: url)
+
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                throw NSError(domain: "MediaGrab", code: -1, userInfo: [NSLocalizedDescriptionKey: "Download failed from GitHub"])
+            }
+
+            if FileManager.default.fileExists(atPath: targetFile.path) {
+                try FileManager.default.removeItem(at: targetFile)
+            }
+
+            try FileManager.default.moveItem(at: tempURL, to: targetFile)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: targetFile.path)
+
+            installProgressText = "ffmpeg installed successfully!"
+            refresh()
+            isInstalling = false
+        } catch {
+            installError = error.localizedDescription
+            installProgressText = "ffmpeg installation failed: \(error.localizedDescription)"
+            isInstalling = false
+        }
+    }
+
+    /// Automatically installs both yt-dlp and ffmpeg in sequence with 1 click.
+    func installAllDependencies() async {
+        if !isReady {
+            await installYTDLP()
+        }
+        if !hasFFmpeg {
+            await installFFmpeg()
+        }
+    }
+
     // MARK: - Update yt-dlp
 
     /// Runs `yt-dlp -U` to update to the latest version.
